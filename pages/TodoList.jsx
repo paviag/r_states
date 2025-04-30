@@ -1,24 +1,36 @@
-import React, { useState } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import { View, Text, FlatList, StyleSheet, TextInput, Modal, Button } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { FAB, IconButton } from "react-native-paper";  // <-- Importamos IconButton
+import { TodoContext } from "../context/todoProvider";
+import { ActivityIndicator } from "react-native";
 
 export default function TodoList() {
-  const [data, setData] = useState([{ id: 1, name: "Item 1" }]);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [editedText, setEditedText] = useState("");
+  const [newItemText, setNewItemText] = useState("");
 
-  const addItem = () => {
+  const { refreshTodos, deleteTodo, createTodo, updateTodo, loading, todos, error } =
+    useContext(TodoContext);
+
+  useEffect(() => {
+    refreshTodos();
+  }, []);
+  
+  const addItem = async() => {
+    if (newItemText.length == "") return;
+
     const newItem = {
-      id: data.length > 0 ? data[data.length - 1].id + 1 : 1,
-      name: `Item ${data.length + 1}`,
+      //id: todos.length > 0 ? todos[todos.length - 1].id + 1 : 1,
+      name: newItemText,
     };
-    setData((prevData) => [...prevData, newItem]);
+
+    await createTodo(newItem);
   };
 
-  const deleteItem = (id) => {
-    setData((prevData) => prevData.filter((item) => item.id !== id));
+  const deleteItem = async(id) => {
+    await deleteTodo(id);
   };
 
   const openEditModal = (item) => {
@@ -27,12 +39,10 @@ export default function TodoList() {
     setModalVisible(true);
   };
 
-  const saveEdit = () => {
-    setData((prevData) =>
-      prevData.map((item) =>
-        item.id === selectedItem.id ? { ...item, name: editedText } : item
-      )
-    );
+  const saveEdit = async() => {
+
+    await updateTodo( { id: selectedItem.id, name: editedText })
+
     setModalVisible(false);
     setSelectedItem(null);
     setEditedText("");
@@ -52,15 +62,38 @@ export default function TodoList() {
     </View>
   );
 
+
+  if (loading) {
+    return (
+      <SafeAreaView
+        style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+      >
+        <ActivityIndicator size="large" />
+        <Text>Loading todos...</Text>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView
+        style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+      >
+        <Text style={{ color: "red" }}>{error}</Text>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <View style={{ flex: 1 }}>
         <FlatList
-          data={data}
+          data={todos}
           renderItem={renderItem}
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={{ padding: 16 }}
         />
+        <TextInput style={styles.fabInput} placeholder="New Item" onChangeText={(t) => setNewItemText(t)} />
         <FAB style={styles.fab} icon="plus" color="white" onPress={addItem} />
       </View>
 
@@ -109,7 +142,21 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 16,
     right: 16,
+    height: 60,
+    width: 60,
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: "#6200ee",
+  },
+  fabInput: {
+    position: "absolute",
+    bottom: 16,
+    left: 16,
+    right: 76,
+    height: 60,
+    paddingLeft: 20,
+    backgroundColor: "#ddd",
+    borderRadius: 10,
   },
   modalOverlay: {
     flex: 1,
